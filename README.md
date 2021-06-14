@@ -6,31 +6,31 @@ The files use R Markdown and contains comments and questions that had to be answ
 
 Here is a brief description of what's contained in each of them:
 
-- diamonds_exploration.rmd
+- diamonds_exploration
     - Simple exploratory analysis of the Diamonds dataset.
 
-- MissingData.rmd
+- MissingData
     - Application on how to remove/treat missing values. Row-wise, Column-wise, Imputation using PMM.
 
-- CorrelationAndRegression.rmd
+- CorrelationAndRegression
     - Calculating and interpreting correlation matrices, and training simple linear regression.
 
-- LassoReg.rmd
+- LassoReg
     - Basic data prep, exploratory and simple/multiple linear regression with Lasso/Ridge.
 
-- ModelValidation.rmd
+- ModelValidation
     - Basic data prep, exploratory and multiple linear regression with metric interpretation.
 
-- LogRegWithROC.rmd
+- LogRegWithROC
     - Logistic regression and confusion matrix / ROC calculation/interpretation
 
-- DecisionTrees.rmd
+- DecisionTrees
     - Training, visualizing and interpreting decision trees
 
-- RandomForest.rmd
+- RandomForest
     - Training, visualizing and interpreting random forest
 
-- Clustering.rmd
+- Clustering
     - Training, visualizing and interpreting k-means clusters
 
 All the data used is within the Data folder.
