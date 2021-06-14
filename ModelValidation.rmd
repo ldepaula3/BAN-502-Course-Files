@@ -1,8 +1,7 @@
 ---
-output:
-  word_document: default
-  html_document: default
+output=github_document
 ---
+
 # Assignment 1
 ## Model Validation
 ### Lucas de Paula
@@ -13,7 +12,8 @@ Libraries
 
 &nbsp;
 
-```{r}
+```{r ,warning=FALSE,message=FALSE}
+
 library(tidyverse)
 library(tidymodels)
 library(glmnet)
@@ -23,6 +23,7 @@ library(MASS)
 library(car)
 library(lubridate)
 library(lmtest)
+
 ```
 
 &nbsp;

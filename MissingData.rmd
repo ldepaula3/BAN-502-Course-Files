@@ -1,7 +1,5 @@
 ---
-output:
-  word_document: default
-  html_document: default
+output=github_document
 ---
 
 &nbsp;
@@ -11,7 +9,7 @@ output:
 
 &nbsp;
 
-```{r, include = FALSE}
+```{r,warning=FALSE,message=FALSE}
 
 library(tidyverse)
 library(mice)

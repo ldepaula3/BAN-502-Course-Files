@@ -1,14 +1,13 @@
 ---
-output:
-  word_document: default
-  html_document: default
+output=github_document
 ---
+
 # Assignment 3
 ## Lucas de Paula
 
 &nbsp;
 
-```{r Libraries}
+```{r ,warning=FALSE,message=FALSE}
 library(tidyverse)
 library(tidymodels)
 library(ROCR) 

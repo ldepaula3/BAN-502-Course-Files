@@ -1,13 +1,12 @@
 ---
-output:
-  word_document: default
-  html_document: default
+output=github_document
 ---
+
 # Lucas de Paula
 # Assignment 2 - Decision tree
 
 
-```{r include = FALSE}
+```{r ,warning=FALSE,message=FALSE}
 library(tidyverse)
 library(tidymodels)
 library(caret)

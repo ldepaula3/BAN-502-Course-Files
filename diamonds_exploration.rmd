@@ -1,10 +1,8 @@
 ---
-output:
-  word_document: default
-  html_document: default
+output=github_document
 ---
 
-```{r Task1}
+```{r ,warning=FALSE,message=FALSE}
 
 library(tidyverse)
 

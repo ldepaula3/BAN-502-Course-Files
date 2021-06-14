@@ -1,4 +1,8 @@
-```{r}
+---
+output=github_document
+---
+
+```{r ,warning=FALSE,message=FALSE}
 
 library("tidymodels")
 library("tidyverse")
