@@ -1,0 +1,144 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# Assignment 1
+## Model Validation
+### Lucas de Paula
+
+&nbsp;
+
+Libraries  
+
+&nbsp;
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+```
+
+&nbsp;
+
+Reading the dataset  
+
+&nbsp;
+
+
+```{r ReadData}
+
+bike = read_csv("data/bike_cleaned.csv")
+
+bike = bike %>% mutate(dteday = mdy(dteday))
+
+bike = bike %>% mutate_if(is.character, as_factor)
+
+bike = bike %>% mutate(hr = as_factor(hr))
+
+``` 
+
+&nbsp;
+
+Splitting the dataset
+
+&nbsp;
+
+```{r SplitData}
+
+set.seed(1234)
+
+bike_split = initial_split(bike, prop = 0.70, strata = count)
+
+train = training(bike_split)
+
+test = testing(bike_split)
+
+```
+
+&nbsp;
+
+#### How many rows of data are in each set (training and testing) ?
+
+&nbsp;
+
+```{r Task2}
+
+n_row_test = nrow(test)
+n_row_train = nrow(train)
+
+```
+
+&nbsp;
+
+Answer: there are `r n_row_test` on the test dataset and `r n_row_train` on the training dataset
+
+&nbsp;
+
+```{r LinearModel}
+
+bike_rcp = recipe(count ~ season + mnth + hr + holiday + weekday + temp + weathersit , train) %>%
+  step_dummy(all_nominal())
+
+bike_model = 
+  linear_reg() %>% 
+  set_engine("lm")
+
+bike_wflow = 
+  workflow() %>% 
+  add_model(bike_model) %>% 
+  add_recipe(bike_rcp)
+
+bike_fit = fit(bike_wflow, train)
+
+summary(bike_fit$fit$fit$fit)
+
+```
+
+&nbsp;
+
+This model has an adjusted R-square of 0.6223 on the training dataset. I can't affirm if this is indeed a good model as I would need to test it on a test dataset to make sure it generalizes well - although based on its adj. R-square value, it is not overfitting, which is a good indicator.
+Some of the variables are significant and some are not. I think a good way to improve this model would be to use stepwise variable selection to detect the best model and maybe add a lasso penalty to the model to get a better model.
+
+&nbsp;
+
+```{r Predicitons}
+
+predict_train = bike_fit %>% 
+  predict(train) %>% 
+  bind_cols(train)
+
+ggplot(predict_train, aes(x = .pred)) + 
+  geom_histogram(bins = 100)
+
+```
+
+&nbsp;
+
+The prediction histogram looks like a normal distribution where the majority of the predictions are sitting between 0 and 300. 
+There are some negative predictions, but because Count can't be negative based on its definition - total rental bikes including both casual and registered - I doubt these predictions are right and should be investigated.
+
+&nbsp;
+
+```{r RSquareTest}
+
+predict_test = bike_fit %>%
+  predict(test) %>%
+  bind_cols(test) %>%
+  metrics(truth = count, estimate = .pred)
+
+predict_test
+
+```
+
+&nbsp;
+
+The metrics of the model on the test dataset are pretty similar to the ones found on the training dataset. For instance, the R-Square on the test dataset is *0.6248* while the R-square on the train dataset is *0.6237*. Because there is not a big difference between both samples, we can conclude that the model generalizes well when predicting for Count - thus it is not overfitting.
+
+&nbsp;

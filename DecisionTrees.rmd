@@ -1,0 +1,361 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# Lucas de Paula
+# Assignment 2 - Decision tree
+
+
+```{r include = FALSE}
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+
+```
+
+```{r include = FALSE}
+
+parole = read.csv("data/parole.csv")
+
+parole = parole %>% 
+        mutate(male = as_factor(male),  
+               race = as_factor(race),  
+               state = as_factor(state),  
+               crime = as_factor(crime),  
+               multiple.offenses = as_factor(multiple.offenses),  
+               violator = as_factor(violator) ) %>% 
+        mutate(male = fct_recode(male, "male" = "1", "female" = "0" ),
+              race = fct_recode(race, "white" = "1", "non-white" = "2" ),
+              state = fct_recode(state, "other" = "1", "kentucky" = "2" , "louisiana" = "3", "virginia" = "4"  ),
+              crime = fct_recode(crime, "larceny" = "2", "drug-related" = "3", "driving-related" = "4", "other" = "1"  ),
+              multiple.offenses = fct_recode(multiple.offenses, "multiple" = "1", "singular" = "0" ),
+              violator = fct_recode(violator, "violated" = "1", "no violation" = "0" ))
+
+```
+
+&nbsp;
+
+## Task 1: 
+### Split the data into training and testing sets. Your training set should have 70% of the data. Use a random number (set.seed) of 12345.
+
+&nbsp;
+
+```{r}
+
+set.seed(12345) 
+
+parole_split = initial_split(parole, prop = 0.7, strata = violator)
+
+train = training(parole_split)
+test = testing(parole_split)
+
+```
+
+&nbsp;
+
+## Task 2: 
+### Create a classification tree to predict “violator” in the training set (using all of the other variablesas predictors). Plot the tree. You do not need to tune the complexity parameter (i.e., it’s OK to allow R totry different cp values on its own).
+
+&nbsp;
+
+```{r}
+
+parole_recipe = recipe(violator  ~., train)
+
+tree_model = decision_tree() %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+parole_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(parole_recipe)
+
+parole_fit = fit(parole_wflow, train)
+
+tree = parole_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree, tweak=1.12)
+
+```
+
+&nbsp;
+
+## Task 3: 
+### For the tree created in Task 2, how would you classify:
+### - a 40 year-old parolee 
+### - from Louisiana
+### - who served 5 years in prison, 
+### - with a sentence of 10 years,
+### - committed multiple offenses? 
+### Describe how you “walk through” the classification tree to arrive at your answer.
+
+&nbsp;
+
+I would classify this parolee as: violation.
+I start with the first split and look at the rules we are trying to classify. 
+I kept following the splits until I reach a final classification, which in this case is on node 15.
+For this assignment, because Race is not one of the values we are using as input variable, I considered non-White for the 2 split.
+
+&nbsp;
+
+## Task 4: 
+### Examine the complexity parameter (cp) values tried by R. Which cp value is optimal (recall that the optimal cp corresponds to the minimized “x error” value)? Is the tree from Task 2 associated with this optimal cp?
+
+&nbsp;
+
+```{r}
+
+parole_fit$fit$fit$fit$cptable
+
+```
+
+&nbsp;
+
+The optimal CP is 0.10  and generated an XERROR of 1.314815. The resulting tree contains 8 splits, which matches the resulting tree we saw above.
+
+&nbsp;
+
+## Task 5: 
+### Use a tuning grid (as we did in the Titanic problem) to try 25 different values for the complexityparameter (cp). R will select reasonable values. Use 5-fold k-fold cross-validation (don’t forget to set up yourfolds). Use a seed of 123 when setting up your folds.Use the code from the lecture to graphically examine model performance for the different values of cp.
+### Hint: You can reuse the vast majority of the code that I provided for you. Be careful to change names andyou should be “good to go”. Note: This model took about two minutes to run on my computer. Your runtime will vary by your computational power :)
+
+&nbsp;
+
+```{r}
+
+set.seed(123)
+
+folds = vfold_cv(train, v = 5)
+
+parole_recipe = recipe(violator ~., train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+tree_grid = grid_regular(cost_complexity(),
+                          levels = 25) 
+
+parole_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(parole_recipe)
+
+tree_res = 
+  parole_wflow %>% 
+  tune_grid(
+    resamples = folds,
+    grid = tree_grid
+    )
+
+tree_res
+```
+
+&nbsp;
+
+```{r}
+
+tree_res %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+
+
+best_tree = tree_res %>%
+  select_best("accuracy")
+
+best_tree
+
+```
+
+&nbsp;
+
+## Task 6: 
+### Which cp value yields the “optimal” accuracy value?
+
+&nbsp;
+
+CP = 0.0421 yields the optimal accuracy value on Model24.
+
+&nbsp;
+
+## Task 7: 
+### Try to plot the tree that corresponds to the cp value from Task 6. Don’t forget to finalize your workflow and generate your final fit before trying to plot.
+
+&nbsp;
+
+```{r}
+
+final_wf = 
+  parole_wflow %>% 
+  finalize_workflow(best_tree)
+
+final_fit = fit(final_wf, train)
+
+tree = final_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+# fancyRpartPlot(tree, tweak = 1.5) 
+
+```
+
+&nbsp;
+
+## Task 8: 
+### What is the accuracy of the “root” that you generated in Task 7? Take your time and think about how to determine this value.
+
+&nbsp;
+
+By definition the root tree will predict all observations to belong to the majority class (no violation).
+This means that if we look at the distribution of the class on the dataset (train). 
+In our data set we have 417 no violations and 54 violated. Which means that if we divide 417 by 471, we will get a value of 0.885.
+Thus, the accuracy of the model will be 0.885. We can also see this by examining the final_fit variable.
+
+&nbsp;
+
+```{r}
+
+final_fit
+
+```
+
+&nbsp;
+
+## Task 9
+### Read in the “Blood.csv” dataset. The dataset contains five variables:Mnths_Since_Last: Months since last donationTotalDonations: Total number of donationTotal_Donated: Total amount of blood donatedMnths_Since_First: Months since first donationDonatedMarch: Binary variable representing whether he/she donated blood in March (1 = Yes, 0 = No)Convert the DonatedMarch variable to a factor and recode the variable so 0 = “No” and 1 = “Yes”.
+
+&nbsp;
+
+```{r}
+
+blood = read.csv("data/Blood.csv")
+
+blood = blood %>% 
+        mutate(DonatedMarch = as_factor(DonatedMarch)) %>% 
+        mutate(DonatedMarch = fct_recode(DonatedMarch, "No" = "0", "Yes" = "1" ))
+
+```
+
+&nbsp;
+
+## Task 9: 
+### Split the dataset into training (70%) and testing (30%) sets.You may wish to name your training and testing sets “train2” and “test2” as to not confuse them with the parole datsetsUse set.seed of 1234. 
+### Then develop a classification tree on the training set to predict “DonatedMarch”. Asyou did in Task 5, let R try 25 different values of cp. Don’t forget to create new folds on the new trainingdataset :) Use a seed of 1234 for the folds.Graphically examine how the relationship between cp values and accuracy. What cp value appears to be“optimal” to maximize accuracy?
+
+&nbsp;
+
+```{r}
+
+set.seed(1234) 
+
+blood_split = initial_split(blood, prop = 0.7, strata = DonatedMarch)
+
+bl_train = training(blood_split)
+bl_test = testing(blood_split)
+
+```
+
+&nbsp;
+
+```{r}
+
+set.seed(1234)
+
+folds = vfold_cv(bl_train, v = 5)
+
+blood_recipe = recipe(DonatedMarch ~., bl_train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+tree_grid = grid_regular(cost_complexity(),
+                          levels = 25) 
+
+blood_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(blood_recipe)
+
+tree_res = 
+  blood_wflow %>% 
+  tune_grid(
+    resamples = folds,
+    grid = tree_grid
+    )
+
+tree_res
+
+```
+```{r}
+tree_res %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+
+
+best_tree = tree_res %>%
+  select_best("accuracy")
+
+best_tree
+```
+
+&nbsp;
+
+If we consider accuracy alone, it looks like a CP value between 0.05 and 0.02 should maximize accuracy. But the AUC is maximized around 0.02. The algorithm selects CP = 0.007498942, which based on the graphs, is somewhere around where the accuracy reaches its peak.
+
+&nbsp;
+
+
+```{r}
+final_wf = 
+  blood_wflow %>% 
+  finalize_workflow(best_tree)
+
+final_fit = fit(final_wf, bl_train)
+
+tree = final_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+fancyRpartPlot(tree, tweak = 1.5) 
+```
+
+&nbsp;
+
+```{r}
+train_treepred = predict(final_fit, bl_train, type = "class")
+confusionMatrix(train_treepred$.pred_class,bl_train$DonatedMarch,positive="Yes")
+```
+
+&nbsp;
+
+```{r}
+
+test_treepred = predict(final_fit, bl_test, type = "class")
+confusionMatrix(test_treepred$.pred_class,bl_test$DonatedMarch,positive="Yes")
+
+```
+
+&nbsp;
+
+As we can see, the accuracy of the model on the training dataset is 0.8317, and 0.7511 on the test dataset. There is a considerable difference between the training and testing datasets, which could mean our model is not generalizing well. 
+In any case, if we classify incorrectly in this case would be less tragic than the first example on Parole. So if our model has an accuracy of 0.75, it is much better than randomly predicting if someone will donate or not in March, meaning it helps us have an idea on the expected number of donations. 
+
+
+

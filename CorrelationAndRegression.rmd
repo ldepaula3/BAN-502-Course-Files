@@ -1,0 +1,116 @@
+```{r}
+
+library("tidymodels")
+library("tidyverse")
+library("GGally")
+library("lmtest")
+
+
+```
+
+```{r}
+
+air = airquality
+
+summary(air)
+
+```
+
+
+```{r}
+
+
+air2 = drop_na(data = air)
+
+```
+
+```{r}
+ggpairs(air2)
+
+ggcorr(air2, label = TRUE)
+```
+
+
+```{r}
+
+ggplot(air2, aes(x = Temp, y = Ozone)) + geom_point()
+
+```
+
+
+```{r}
+
+ozone_rcp = recipe(Ozone ~ Temp, air2)
+
+lm_model = 
+  linear_reg() %>% 
+  set_engine("lm")
+
+lm_wflow = 
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ozone_rcp)
+
+lm_fit2 =  fit(lm_wflow, air2)
+
+summary(lm_fit2$fit$fit$fit)
+
+confint(lm_fit2$fit$fit$fit)
+
+```
+
+```{r}
+
+ggplot(air2, aes(x = Temp, y = Ozone)) + 
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE)
+
+```
+
+```{r}
+
+# Prediction
+
+testdata = data.frame(Temp = 80)
+predict(lm_fit2, new_data = testdata)
+
+```
+
+```{r}
+
+# Correlation between predictor and response
+
+ggplot(air2, aes(x = Temp, y = Ozone)) + geom_point() + geom_smooth(method = "lm", color = "red")
+
+```
+
+```{r}
+
+# Are residuals independent?
+
+dwtest(lm_fit2$fit$fit$fit)
+
+# We fail to reject the null hypothesis with a p-value > 0.05. This suggests the residuals are likely independent.
+
+```
+
+```{r}
+
+# Model residuals exhibit constant variance?
+
+air3 = air2 %>% mutate (resid1 = lm_fit2$fit$fit$fit$residuals)
+
+ggplot(air3, aes(x=Temp, y = resid1))+ geom_point()
+
+```
+
+```{r}
+
+
+# Is the residuals normal?
+
+ggplot(air3,aes(x = resid1)) + geom_histogram()
+
+# The residuals are not normal
+```
+

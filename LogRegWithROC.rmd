@@ -1,0 +1,401 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# Assignment 3
+## Lucas de Paula
+
+&nbsp;
+
+```{r Libraries}
+library(tidyverse)
+library(tidymodels)
+library(ROCR) 
+library(GGally)
+```
+
+&nbsp;
+
+## Carefully convert the male, race, state, crime, multiple.offenses, and violator variables to factors. 
+## Recode (rename) the factor levels of each of these variables according to the description of the variables provided in the ParoleData.txt file (located with the assignment on Canvas).
+
+&nbsp;
+
+```{r Prep}
+
+parole = read.csv("data/parole.csv")
+
+parole = parole %>% 
+        mutate(male = as_factor(male),  
+               race = as_factor(race),  
+               state = as_factor(state),  
+               crime = as_factor(crime),  
+               multiple.offenses = as_factor(multiple.offenses),  
+               violator = as_factor(violator) ) %>% 
+        mutate(male = fct_recode(male, "male" = "1", "female" = "0" ),
+              race = fct_recode(race, "white" = "1", "non-white" = "2" ),
+              state = fct_recode(state, "other" = "1", "kentucky" = "2" , "louisiana" = "3", "virginia" = "4"  ),
+              crime = fct_recode(crime, "larceny" = "2", "drug-related" = "3", "driving-related" = "4", "other" = "1"  ),
+              multiple.offenses = fct_recode(multiple.offenses, "multiple" = "1", "singular" = "0" ),
+              violator = fct_recode(violator, "violated" = "1", "no violation" = "0" ))
+
+```
+
+&nbsp;
+
+### Task 1: Split the data into training and testing sets. Your training set should have 70% of the data. Use arandom number (set.seed) of 12345. Be sure that the split is stratified by “violator”.
+
+&nbsp;
+
+```{r Split}
+
+set.seed(12345)
+
+parole_split = initial_split(parole, prop = 0.70, strata = violator)
+
+train = training(parole_split)
+test = testing(parole_split)
+
+```
+
+&nbsp;
+
+### Task 2: Our objective is to predict whether or not a parolee will violate his/her parole. In this task, use appropriate data visualizations and/or tables to identify which variables in the training set appear to be most predictive of the response variable “violator”. Provide a brief explanation of your thought process.
+
+&nbsp;
+
+```{r Exploratory Analysis}
+
+summary(train)
+
+# ggpairs(train)
+
+```
+
+&nbsp;
+
+Based out of the overall correlation plots, it looks like the categorical variables state, multiple.offenses and crime yield will help us predict violator. Let's check with the bar-charts.
+
+&nbsp;
+
+```{r ExploratoryNominalGraphs}
+
+ggplot(train, aes(x=state, fill = violator)) + geom_bar(position="fill") + theme_bw()
+
+ggplot(train, aes(x=multiple.offenses, fill = violator)) + geom_bar(position="fill") + theme_bw()
+
+ggplot(train, aes(x=crime, fill = violator)) + geom_bar(position="fill") + theme_bw()
+
+```
+
+&nbsp;
+
+Based on our assumption, we can clearly see Louisiana has more violators than any other state, and Virginia appears to have the least number of violators.
+
+&nbsp;
+
+Now let's check the interval variables. It appears to me that max.sentence and time.served will impact the violator predictions.
+
+&nbsp;
+
+```{r ExploratoryIntervalGraphs}
+
+ggplot(train, aes(x=violator, y= age)) + geom_boxplot() + theme_bw()
+
+ggplot(train, aes(x=violator, y= max.sentence)) + geom_boxplot() + theme_bw()
+
+ggplot(train, aes(x=violator, y= time.served)) + geom_boxplot() + theme_bw()
+
+```
+&nbsp;
+
+Again, our assumption is mostly right for max.sentence and time.served as both variables have different means and distribution patterns.
+
+&nbsp;
+
+Based on these variables, let's create a model with the variable that appears to have most impact on our predictor: state
+
+&nbsp;
+
+## Task 3: Identify the variable from Task 2 that appears to you to be most predictive of “violator”. Create alogistic regression model using this variable to predict violator. Comment on the quality of the model.
+
+&nbsp;
+
+### Model with State as independent variable
+
+&nbsp;
+
+```{r SimpleLogisticReg}
+
+parole_model = 
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe = recipe(violator ~ state, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf = workflow() %>%
+  add_recipe(parole_recipe) %>% 
+  add_model(parole_model)
+
+parole_fit = fit(logreg_wf, train)
+
+summary(parole_fit$fit$fit$fit)
+
+```
+
+&nbsp;
+
+## Task 4: Manually the best model you can to predict “violator”. Use only the training data set and use AIC to evaluate the “goodness” of the models. Comment on the quality of your final model. In particular, notewhich variables are significant and comment on how intuitive the model may (or may not) be.
+
+&nbsp;
+
+### Model with State and Max.sentence as independent variables
+
+&nbsp;
+
+```{r Model1}
+
+parole_recipe1 = recipe(violator ~ state + max.sentence, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf1 = workflow() %>%
+  add_recipe(parole_recipe1) %>% 
+  add_model(parole_model)
+
+parole_fit1 = fit(logreg_wf1, train)
+
+summary(parole_fit1$fit$fit$fit)
+
+```
+
+&nbsp;
+
+### Model with State and Max.Sentence and Time.Served as independent variables
+
+&nbsp;
+
+```{r Model2}
+
+parole_recipe2 = recipe(violator ~ state + max.sentence + time.served, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf2 = workflow() %>%
+  add_recipe(parole_recipe2) %>% 
+  add_model(parole_model)
+
+parole_fit2 = fit(logreg_wf2, train)
+
+summary(parole_fit2$fit$fit$fit)
+
+```
+
+&nbsp;
+
+### Model with State, Max.Sentence, Time.Served and Crime as independent variables
+
+&nbsp;
+
+```{r Model3}
+
+parole_recipe3 = recipe(violator ~ state + max.sentence + time.served + crime, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf3 = workflow() %>%
+  add_recipe(parole_recipe3) %>% 
+  add_model(parole_model)
+
+parole_fit3 = fit(logreg_wf3, train)
+
+summary(parole_fit3$fit$fit$fit)
+
+```
+
+&nbsp;
+
+### Model with State, Max.Sentence, Time.Served, Crime and multiple.offenses as independent variables
+
+&nbsp;
+
+```{r Model4}
+
+parole_recipe4 = recipe(violator ~ state + max.sentence + time.served + crime + multiple.offenses, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf4 = workflow() %>%
+  add_recipe(parole_recipe4) %>% 
+  add_model(parole_model)
+
+parole_fit4 = fit(logreg_wf4, train)
+
+summary(parole_fit4$fit$fit$fit)
+
+```
+
+&nbsp;
+
+As we can see from the experiments above, the best model, based on AIC metric, is the one with  State, Max.Sentence, Time.Served, and Crime as independent variables - with AIC = 294.28.  If we add another variable: multiple.offenses, it drops significantly to 279.82. The impressive thing about the champion model is that only the state variable is significant in the model, where the state of Virginia impacts the prediction negatively and Louisiana impacts it positively. Out of all the models, the champion model is the simplest model of all, but at the same time, is very dependent on the variable state, which might not be a good thing.
+
+&nbsp;
+
+## Task 5: Create a logistic regression model using the training set to predict “violator” using the variables:state, multiple.offenses, and race. Comment on the quality of this model. Be sure to note which variables are significant.
+
+&nbsp;
+
+```{r LogRegTask5}
+
+parole_model5 = 
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe5 = recipe(violator ~ state + multiple.offenses + race, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+logreg_wf5 = workflow() %>%
+  add_recipe(parole_recipe5) %>% 
+  add_model(parole_model5)
+
+parole_fit5 = fit(logreg_wf5, train)
+
+summary(parole_fit5$fit$fit$fit)
+
+```
+
+&nbsp;
+
+Out of all the models built so far, this is the one that performs the worst with an AIC of 269.04. The significant variables are: intercept, state_virginia, multiple offenses, race_non.white. 
+
+&nbsp;
+
+## Task 6: What is the predicted probability of parole violation of the two following parolees? 
+## Parolee1:Louisiana with multiple offenses and white race 
+## Parolee2: Kentucky with no multiple offenses and other race
+
+&nbsp;
+
+```{r Predictions}
+
+parolee1 = data.frame(state = "louisiana", multiple.offenses = "multiple", race = "white")
+
+pred1 = predict(parole_fit5, parolee1, type="prob")
+
+parolee2 = data.frame(state = "kentucky", multiple.offenses = "singular", race = "non-white")
+
+pred2 = predict(parole_fit5, parolee2, type="prob")
+
+pred1
+pred2
+```
+
+&nbsp;
+
+The predicted probability of parole violation for parolee1 is `r pred1$.pred_violated` and for parolee2 is `r pred2$.pred_violated `
+
+&nbsp;
+
+## Task 7: Develop an ROC curve and determine the probability threshold that best balances specificity andsensitivity (on the training set).
+
+&nbsp;
+
+```{r RocCurve}
+
+predictions = predict(parole_fit5, train, type="prob")[2]
+head(predictions)
+
+ROCRpred = prediction(predictions, train$violator) 
+
+ROCRperf = performance(ROCRpred, "tpr", "fpr")
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7))
+
+opt.cut = function(perf, pred){
+    cut.ind = mapply(FUN=function(x, y, p){
+        d = (x - 0)^2 + (y-1)^2
+        ind = which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
+            cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+print(opt.cut(ROCRperf, ROCRpred))
+
+```
+&nbsp;
+
+Based on the code above, the best cutoff value would be 0.12, which would give us a specificity of 0.82 and a sensitiity of 0.75.
+
+&nbsp;
+
+## Task 8: What is the accuracy, sensitivity, and specificity of the model on the training set given the cutoff from Task 7? What are the implications of incorrectly classifying a parolee?
+
+&nbsp;
+
+```{r ModelAssessment}
+
+t1 = table(train$violator,predictions > 0.1295001)
+
+t1
+
+acc = (t1[1,1]+t1[2,2])/nrow(train)
+sen = t1[2,2] / (t1[2,2] + t1[2,1])
+spc = t1[1,1] / (t1[1,1] + t1[1,2])
+
+```
+
+&nbsp;
+
+The accuracy of the model with cutoff = 0.1295001 is `r acc `, the sensitivity of the model is `r sen` and the specificity is `r spc`.
+If the model incorrectly classifies parole, it will have profound impacts on society as a non-guilty citizen can may be put in prison, or a guilty citizen may be set free in society.
+
+&nbsp;
+
+## Task 9: Identify a probability threshold (via trial-and-error) that best maximizes accuracy on the trainingset.
+
+&nbsp;
+
+```{r ProbThreshold}
+
+print("Tentative 1 - probability threshold = 0.5")
+t1 = table(train$violator,predictions > 0.5)
+t1
+(t1[1,1]+t1[2,2])/nrow(train)
+
+print("Tentative 2 - probability threshold = 0.6")
+t2 = table(train$violator,predictions > 0.6)
+t2
+(t2[1,1]+t2[2,2])/nrow(train)
+
+print("Tentative 3 - probability threshold = 1")
+t3 = table(train$violator,predictions > 1)
+t3
+(t3[1])/nrow(train)
+
+```
+
+&nbsp;
+
+Apparently, a threshold of 0.5 will get the model the highest accuracy, 0.8990.
+
+&nbsp;
+
+## Task 10: Use your probability threshold from Task 9 to determine accuracy of the model on the testing set.
+
+&nbsp;
+
+```{r ProbThresholdTest}
+
+predictions_test = predict(parole_fit5, test, type="prob")[2]
+head(predictions_test)
+
+test_pred = table(test$violator,predictions_test > 0.5)
+test_pred
+
+acc_test = (test_pred[1,1]+test_pred[2,2])/nrow(test)
+
+```
+
+&nbsp;
+
+The accuracy of the model for the testing dataset is `r acc_test`
+
+&nbsp;
+

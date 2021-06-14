@@ -1,0 +1,213 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+```
+
+```{r Task1}
+
+bike = read_csv("data/bike_cleaned.csv")
+
+bike = bike %>% mutate(dteday = mdy(dteday))
+
+bike = bike %>% mutate_if(is.character, as_factor)
+
+bike = bike %>% mutate(hr = as_factor(hr))
+
+```
+
+&nbsp;
+
+## Task 2: Which of the quantitative variables appears to be best correlated with “count” (ignore the “registered”and “casual” variable as the sum of these two variables equals “count”)?
+
+&nbsp;
+
+
+```{r}
+
+# Select numeric columns to calculate correlation
+
+num_cols = bike %>% 
+  dplyr::select(c("instant","temp","atemp","hum","windspeed","casual","registered","count"))
+
+corr = round(cor(num_cols), 2) #Note the ,1:11 code to select the columns for inclusion
+
+ggcorrplot(corr, hc.order = TRUE, type = "lower", lab = TRUE)
+
+```
+
+&nbsp;
+
+Based on the correlation plot above, count is positively strong correlated with Registered and Casual.
+
+&nbsp;
+
+## Task 3:We cannot use correlation to assess the relationship between a categorical predictor variable andour response variable. A good option is to visualize the relationship between the categorical and responsevariables via a boxplot (or similar visualization). 
+## Repeat this boxplot-based analysis for each of the categorical variables. Which variables appear to affect“count”? Provide a brief explanation as to why you believe that each variable does or does not affect “count”(use your intuition to help you answer this question).
+
+&nbsp;
+
+```{r}
+
+ggplot(bike,aes(x=hr,y=count))+ geom_boxplot()+ theme_bw()
+
+ggplot(bike, aes(x = season , y = count)) + geom_boxplot() + theme_bw()
+ggplot(bike, aes(x = mnth , y = count)) + geom_boxplot() + theme_bw()
+ggplot(bike, aes(x = holiday , y = count)) + geom_boxplot() + theme_bw()
+ggplot(bike, aes(x = weekday , y = count)) + geom_boxplot() + theme_bw()
+ggplot(bike, aes(x = workingday , y = count)) + geom_boxplot() + theme_bw()
+ggplot(bike, aes(x = weathersit , y = count)) + geom_boxplot() + theme_bw()
+  
+```
+&nbsp;
+
+Based on the graphs above, it looks like Count is affected by the variables: mnth, holiday, workingday, weathersit. 
+
+Weathersit and mnth affecting Count more than the rest. My thought process to affirm this is because there is a significant difference in the distributions between these variables (amplitude and average of the groups). The other variables either have a small impact or no impact in the values of Count due to the same reason.
+
+&nbsp;
+
+## Task 4 - As a baseline, choose the “best” variable from the correlation and visualization analysis above and build a model with that variable as the single predictor of “count”. Comment on the quality of the model.
+
+&nbsp;
+
+```{r Task4}
+
+# Building model to predict Count using Registered because it has the highest correlation with the dependent variable.
+
+bike_rcp = recipe(count ~ registered , bike)
+
+bike_model = 
+  linear_reg() %>% 
+  set_engine("lm")
+
+bike_wflow = 
+  workflow() %>% 
+  add_model(bike_model) %>% 
+  add_recipe(bike_rcp)
+
+bike_fit = fit(bike_wflow, bike)
+
+summary(bike_fit$fit$fit$fit)
+
+```
+
+&nbsp;
+
+The model has an R-square of 0.94 and the variable registered has a slope of 1.16. Although the metrics look good, the interpretation of the model itself doesn't tell much as both variables have similar interpretation: count depends on registered as registered means the number of registered users, and count represents the number of rental bikes.
+
+&nbsp;
+
+## Task 5:Create a ridge regression model to predict the “count” variable. You should exclude the “instant”,“dteday”, “registered”, and “casual” variables (i.e., they should not be predictors). You may apply anyappropriate preprocessing steps. HINT: You can use “step_rm” in the recipe to exclude variables from analyis. Select an appropriate value for lambda. Provide a brief commentary on the resulting model.
+
+&nbsp;
+
+
+```{r Task5}
+
+# Training model using Ridge regression
+
+ridge_rcp = recipe(count ~ ., bike) %>% 
+  step_rm("instant", "dteday", "registered", "casual") %>%
+  step_dummy(all_nominal()) %>%
+  step_center(all_predictors()) %>% 
+  step_scale(all_predictors())
+  
+ridge_model = 
+  linear_reg(mixture = 0, penalty = 0.1) %>% 
+  set_engine("glmnet") 
+
+ridge_wflow = 
+  workflow() %>% 
+  add_model(ridge_model) %>% 
+  add_recipe(ridge_rcp)
+
+ridge_fit = fit(ridge_wflow, bike)
+
+ridge_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")  
+        
+```
+
+&nbsp;
+
+
+```{r}
+
+ridge_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")  %>% 
+  coef(s = 15)
+
+```
+
+&nbsp;
+
+The resulting ridge model has a R-Square of 0.62 where Lambda = 15 and contains the predictors: weathersit, workingday, weekday, holiday, hr, mnth, season, windspeed, temp, atemp, hum. All of the variables contain a slop associated with them. 
+
+&nbsp;
+
+
+```{r}
+
+lasso_rcp = recipe(count ~., bike) %>% # add all variables via ~.
+  step_rm("instant", "dteday", "registered", "casual") %>%
+  step_dummy(all_nominal()) %>%
+  step_center(all_predictors()) %>% # centers the predictors
+  step_scale(all_predictors()) # scales the predictors
+  
+lasso_model = # give the model type a name 
+  linear_reg(mixture = 1, penalty = 0.1) %>% # mixture = 0 sets up Ridge Regression
+  set_engine("glmnet") # specify the specify type of linear tool we want to use 
+
+lasso_wflow = 
+  workflow() %>% 
+  add_model(lasso_model) %>% 
+  add_recipe(lasso_rcp)
+
+lasso_fit = fit(lasso_wflow, bike)
+
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")
+
+```
+
+&nbsp;
+
+```{r}
+
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")  %>% 
+  coef(s = 0.530)
+
+```
+
+&nbsp;
+
+The resulting ridge model has a R-Square of 0.6304 where Lambda = 0.530 and contains the predictors: weathersit, workingday, weekday, holiday, hr, mnth, season, windspeed, temp, atemp, hum. Most of the variables contain a slope associated with them. Some of them contain a 0 slope, meaning that variable is not selected as a predictor.
+
+&nbsp;
+
+## What are the implications of the model results from the ridge and lasso methods?
+
+&nbsp;
+
+I have applied the same treatment for both models (ridge and lasso) and used the same variables as predictors. However, because they both use different logic behind the scenes, some of the variables (and levels) will have a zero value associated with the slope. This means the algorithm has dropped that variable (or level) from the model itself. 
+Both techniques will try to reduce model complexity and likelihood of overfitting, but Lasso goes one step ahead and is able to remove a variable from the model by using the value of the variable not the square of it on the penalty calculation, thus the difference in results. 
+
+&nbsp;

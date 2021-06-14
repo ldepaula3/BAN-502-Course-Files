@@ -1,0 +1,145 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+&nbsp;
+
+# Lucas de Paula
+# Module 4 Assignment 1
+
+&nbsp;
+
+```{r, include = FALSE}
+
+library(tidyverse)
+library(mice)
+library(skimr)
+library(VIM)
+```
+
+```{r ReadData}
+
+grades = read.csv("data/class-grades.csv")
+
+```
+
+&nbsp;
+
+The dataset was originally used to investigate how student performance in the course would be predictive of student grades on the “Final” exam. 
+The “Prefix” column is a surrogate for enrollment year in the engineering program.  Smaller values imply older (more mature?) students.
+
+&nbsp;
+
+# Task 1
+## For which variables is there missing data?
+
+&nbsp;
+
+```{r MissingAnalysis}
+
+skim(grades)
+
+```
+
+&nbsp;
+
+As we can see above, the variables Tutorial, Midterm, TakeHome and Final have missing values.
+
+&nbsp;
+
+# Task 2: 
+## Use the VIM package to visualize missingness. Are there any students that are missing multiple pieces of data?
+
+&nbsp;
+
+```{r Task2}
+
+vim_plot = aggr(grades, numbers = TRUE, prop = c(TRUE, FALSE), cex.axis=.7)
+
+```
+
+&nbsp;
+
+Yes, there is one student that has TakeHome and Midterm containing missing values.
+
+&nbsp;
+
+# Task 3: 
+## Use row-wise deletion of missing values to create a new data frame. How many rows remain in this data frame?
+
+&nbsp;
+
+```{r RowWise}
+
+rowwise_grades = grades %>% drop_na() 
+
+nrow(rowwise_grades)
+
+```
+
+&nbsp;
+
+There are 89 observations on the newly created data frame.
+
+&nbsp;
+
+# Task 4: 
+## Use column-wise deletion of missing values to create a new data frame (from the original dataframe not from the data frame created in Task 3). 
+## How many columns remain in this data frame?
+
+&nbsp;
+
+```{r ColWise}
+
+colwise_grades = grades %>% select(-Tutorial, -Midterm, -TakeHome, -Final)
+
+ncol(colwise_grades)
+
+
+```
+
+&nbsp;
+
+There are only two columns left.
+
+&nbsp;
+
+# Task 5: 
+## Which approach (Task 3 or Task 4) seems preferable for this dataset? Briefly discuss your answer.
+
+&nbsp;
+
+I'd say the first approach (row-wise deletion) makes more sense as we are losing much less information during the selection.
+Although we lose 10 rows of data, it means minimal loss of information when compared to losing 4 out of 6 columns.
+
+&nbsp;
+
+# Task 6:
+## Use the “mice” package to impute the missing data in this dataset. Set “m = 5” and “method=”pmm"" in the imputation. 
+## You MUST use a random number seed of 123 for this imputation. 
+## What is the mean value for the “Final” variable after imputation?
+
+&nbsp;
+
+```{r ImputeMissing}
+
+set.seed(123) 
+
+imp_grades = mice(grades, m=5, method='pmm', printFlag=FALSE)
+
+summary(imp_grades)
+
+grades_complete = complete(imp_grades) 
+
+summary(grades_complete)
+
+```
+
+&nbsp;
+
+The mean value for the Final variable after imputation is 68.33.
+
+&nbsp;
+

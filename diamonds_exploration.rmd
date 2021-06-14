@@ -1,0 +1,114 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r Task1}
+
+library(tidyverse)
+
+```
+
+```{r Task2} 
+
+diamonddata <- diamonds
+
+nrow(diamonddata)
+
+ncol(diamonddata)
+
+```
+
+
+The diamonds dataset contains `r nrow(diamonddata)` rows and `r ncol(diamonddata)` columns.
+
+
+```{r Task3}
+
+ggplot(diamonddata, aes(x = carat, y = price)) + 
+  geom_point() + 
+  scale_x_log10()
+
+```
+
+
+The plot shows a positive correlation between carat and price, basically as the carat number increases, the price increases. Meaning the better the quality, the pricier it is.
+
+
+```{r Task4}
+
+ggplot(diamonddata, aes(x = carat, y = price, color = cut)) + 
+  geom_point() + 
+  scale_x_log10()
+
+```
+
+
+The distribution looks the same, but taking the cut of the diamonds into consideration, usually the fair condition diamond is usually in the lower range of the prices in each carat category, and the ideal/premium cuts are usually in the higher end in each carat category.
+
+
+```{r Task5}
+
+ggplot(diamonddata, aes(x = carat, y = price, color = cut)) + 
+  geom_point() + 
+  facet_wrap(~ color, ncol=4) + 
+  scale_x_log10()
+
+
+```
+
+
+The color of the diamond goes from D (best) to J (worst). The price distribution doesn't change much by color, but the cut does. We can see that for distribution D it is more between Premium/Ideal, while for J it contains more Fair cuts , meaning less quality diamonds.
+
+
+```{r Task6}
+
+inventory <- read_csv("data/InventoryData.csv")
+
+inventory
+
+
+```
+
+```{r Task7}
+
+inventoryA <- inventory %>%
+  filter(Supplier == "A")
+
+nrow(inventoryA)
+
+```
+
+
+There are `r nrow(inventoryA)` rows on inventoryA
+
+
+```{r Task8}
+
+inventoryA = mutate(inventoryA, OnHandRatio =`On Hand`/`Annual Demand`)
+
+inventoryA
+
+```
+
+
+This step creates a new column called OnHandRatio that divides the values of On Hand by Annual Demand. 
+
+
+```{r Task9}
+
+avg_cost <- inventory %>%
+  group_by(`Item SKU`) %>%
+  summarize(SKUAvgCost = mean(`Cost per Unit ($)`))
+
+avg_cost
+
+```
+
+
+These courses haven't been super challenging to me, but one feedback that I gave to Prof. Cummings was to add more real world data to treat data in a ETL type of job, and learn more advanced automation ways of creating analysis. I feel that most courses focus on ad-hoc analyses. 
+
+
+
+
